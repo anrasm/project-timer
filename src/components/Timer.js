@@ -3,71 +3,62 @@ import { Button } from '@mui/material';
 import { useProject } from '../context/ProjectContext';
 
 export const Timer = ({ project }) => {
+  const [time, setTime] = useState(project.timeSpent); // Track time in milliseconds
   const [isRunning, setIsRunning] = useState(project.isRunning);
-  const timerRef = useRef(null);
-  const { 
-    updateProjectTime, 
-    activeTimerProjectId, 
-    setActiveTimerProjectId,
-    projects 
-  } = useProject();
+  const startTimeRef = useRef(null);  // Tracks the start time of the timer
+  const timeRef = useRef(time); // To ensure we keep track of the time correctly
+  const animationFrameRef = useRef(null); // Reference for requestAnimationFrame
+
+  // Destructure the necessary functions from the context
+  const { updateProjectTime } = useProject();
 
   useEffect(() => {
-    setIsRunning(activeTimerProjectId === project.id);
-  }, [activeTimerProjectId, project.id]);
-
-  useEffect(() => {
-    if (isRunning && activeTimerProjectId === project.id) {
-      timerRef.current = setInterval(() => {
-        // Find the current project in the latest projects array
-        const currentProject = projects.find(p => p.id === project.id);
-        if (currentProject) {  // Only update if project still exists
-          const newTime = currentProject.timeSpent + 1;
-          updateProjectTime(project.id, newTime, true);
-        } else {
-          // If project no longer exists, clear the interval
-          clearInterval(timerRef.current);
-        }
-      }, 1000);
+    // Start or resume the timer
+    if (isRunning) {
+      startTimeRef.current = Date.now() - timeRef.current; // Time offset from last pause
+      const updateTime = () => {
+        const elapsed = Date.now() - startTimeRef.current; // Time difference
+        timeRef.current = elapsed;
+        setTime(elapsed);
+        animationFrameRef.current = requestAnimationFrame(updateTime); // Keep updating
+      };
+      animationFrameRef.current = requestAnimationFrame(updateTime); // Start the animation loop
     } else {
-      clearInterval(timerRef.current);
+      // If the timer is paused, stop the animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     }
 
-    return () => clearInterval(timerRef.current);
-  }, [isRunning, activeTimerProjectId, project.id, projects]);
+    // Cleanup on component unmount
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isRunning]);
 
   const startTimer = () => {
-    setActiveTimerProjectId(project.id);
-    // Get the latest project data
-    const currentProject = projects.find(p => p.id === project.id);
-    if (currentProject) {
-      updateProjectTime(project.id, currentProject.timeSpent, true);
-    }
+    setIsRunning(true);
   };
 
   const pauseTimer = () => {
-    setActiveTimerProjectId(null);
-    // Get the latest project data
-    const currentProject = projects.find(p => p.id === project.id);
-    if (currentProject) {
-      updateProjectTime(project.id, currentProject.timeSpent, false);
-    }
+    setIsRunning(false);
+    // Update the project state with the current time spent when paused
+    updateProjectTime(project.id, time, false);
   };
 
-  const formatTime = (totalSeconds) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours.toString().padStart(2, '0')}h:${minutes.toString().padStart(2, '0')}m:${seconds.toString().padStart(2, '0')}s`;
+  const formatTime = (totalMilliseconds) => {
+    const hours = Math.floor(totalMilliseconds / 3600000);
+    const minutes = Math.floor((totalMilliseconds % 3600000) / 60000);
+    const seconds = Math.floor((totalMilliseconds % 60000) / 1000);
+    const milliseconds = totalMilliseconds % 1000;
+    return `${hours.toString().padStart(2, '0')}h:${minutes.toString().padStart(2, '0')}m:${seconds.toString().padStart(2, '0')}s:${milliseconds.toString().padStart(3, '0')}ms`;
   };
-
-  // Get the latest time from projects array
-  const currentProject = projects.find(p => p.id === project.id);
-  const currentTime = currentProject ? currentProject.timeSpent : 0;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-      <span>{formatTime(currentTime)}</span>
+      <span>{formatTime(time)}</span>
       {!isRunning ? (
         <Button onClick={startTimer} color="primary" variant="contained">Start</Button>
       ) : (
