@@ -3,49 +3,65 @@ import { Button } from '@mui/material';
 import { useProject } from '../context/ProjectContext';
 
 export const Timer = ({ project }) => {
-  const [time, setTime] = useState(project.timeSpent); // Track time in milliseconds
-  const [isRunning, setIsRunning] = useState(project.isRunning);
-  const startTimeRef = useRef(null);  // Tracks the start time of the timer
-  const timeRef = useRef(time); // To ensure we keep track of the time correctly
-  const animationFrameRef = useRef(null); // Reference for requestAnimationFrame
-
-  // Destructure the necessary functions from the context
-  const { updateProjectTime } = useProject();
+  const [time, setTime] = useState(project.timeSpent);
+  const startTimeRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const lastUpdateRef = useRef(null);  
+  const { updateProjectTime, activeTimerProjectId, setActiveTimerProjectId } = useProject();
 
   useEffect(() => {
-    // Start or resume the timer
-    if (isRunning) {
-      startTimeRef.current = Date.now() - timeRef.current; // Time offset from last pause
-      const updateTime = () => {
-        const elapsed = Date.now() - startTimeRef.current; // Time difference
-        timeRef.current = elapsed;
-        setTime(elapsed);
-        animationFrameRef.current = requestAnimationFrame(updateTime); // Keep updating
-      };
-      animationFrameRef.current = requestAnimationFrame(updateTime); // Start the animation loop
-    } else {
-      // If the timer is paused, stop the animation frame
+    // Reset and sync with project state when not running
+    if (!project.isRunning || project.id !== activeTimerProjectId) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+      startTimeRef.current = null;
+      lastUpdateRef.current = null;
+      setTime(project.timeSpent);
+      return;
     }
 
-    // Cleanup on component unmount
+    // Start or resume timer
+    if (!startTimeRef.current) {
+      startTimeRef.current = Date.now() - project.timeSpent;
+      lastUpdateRef.current = Date.now();
+    }
+
+    const updateTime = () => {
+      const now = Date.now();
+      const elapsed = now - startTimeRef.current;
+
+      // Update time state
+      setTime(elapsed);
+      
+      // Update project time less frequently
+      if (!lastUpdateRef.current || now - lastUpdateRef.current >= 1000) {
+        updateProjectTime(project.id, elapsed, true);
+        lastUpdateRef.current = now;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(updateTime);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(updateTime);
+
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
-  }, [isRunning]);
+  }, [project.isRunning, project.timeSpent, activeTimerProjectId, project.id]);
 
   const startTimer = () => {
-    setIsRunning(true);
+    setActiveTimerProjectId(project.id);
+    updateProjectTime(project.id, time, true);
   };
 
   const pauseTimer = () => {
-    setIsRunning(false);
-    // Update the project state with the current time spent when paused
     updateProjectTime(project.id, time, false);
+    setActiveTimerProjectId(null);
   };
 
   const formatTime = (totalMilliseconds) => {
@@ -59,7 +75,7 @@ export const Timer = ({ project }) => {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
       <span>{formatTime(time)}</span>
-      {!isRunning ? (
+      {(!project.isRunning || project.id !== activeTimerProjectId) ? (
         <Button onClick={startTimer} color="primary" variant="contained">Start</Button>
       ) : (
         <Button onClick={pauseTimer} color="warning" variant="contained">Pause</Button>

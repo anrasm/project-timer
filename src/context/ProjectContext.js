@@ -10,33 +10,72 @@ export const ProjectProvider = ({ children }) => {
 
   useEffect(() => {
     const newTotalTime = projects.reduce((total, project) => {
-      // Convert timeSpent to seconds and sum them
       return total + Math.floor(project.timeSpent / 1000);
     }, 0);
-    setTotalTime(newTotalTime); // Store total time in seconds
+    setTotalTime(newTotalTime);
   }, [projects]);
 
   const addProject = (name) => {
-    const newProject = {
-      id: Date.now(),
-      name,
-      timeSpent: 0,  // time spent in milliseconds
-      isRunning: true // Timer should start immediately
-    };
-    setProjects([...projects, newProject]);  // Update the projects list
-    setActiveTimerProjectId(newProject.id);  // Set this project as the active timer
-  };  
+    const newProjectId = Date.now();
+
+    // Update existing projects and add new one
+    setProjects(prevProjects => {
+      // Stop any running projects and save their time
+      const updatedProjects = prevProjects.map(project => {
+        if (project.isRunning) {
+          const elapsed = Date.now() - project.lastStartTime;
+          return {
+            ...project,
+            isRunning: false,
+            timeSpent: project.timeSpent + elapsed,
+          };
+        }
+        return project;
+      });
+
+      // Add new project
+      return [...updatedProjects, {
+        id: newProjectId,
+        name,
+        timeSpent: 0,
+        isRunning: true,
+        lastStartTime: Date.now()
+      }];
+    });
+
+    // Set new project as active
+    setActiveTimerProjectId(newProjectId);
+  };
 
   const deleteProject = (id) => {
+    if (activeTimerProjectId === id) {
+      setActiveTimerProjectId(null);
+    }
     setProjects(projects.filter(project => project.id !== id));
   };
 
   const updateProjectTime = (id, timeSpent, isRunning) => {
-    setProjects(projects.map(project => 
-      project.id === id 
-        ? { ...project, timeSpent, isRunning }
-        : { ...project, isRunning: false }
-    ));
+    setProjects(prevProjects => 
+      prevProjects.map(project => {
+        if (project.id === id) {
+          // Update the current project
+          return {
+            ...project,
+            timeSpent,
+            isRunning,
+            lastStartTime: isRunning ? Date.now() : null
+          };
+        }
+        // Stop other projects if this one is starting
+        if (isRunning) {
+          return {
+            ...project,
+            isRunning: false
+          };
+        }
+        return project;
+      })
+    );
   };
 
   return (
