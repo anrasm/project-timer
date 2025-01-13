@@ -7,7 +7,7 @@ function App() {
   return (
     <ProjectProvider>
       <CssBaseline />
-      <Container maxWidth="md">
+      <Container maxWidth="md" sx={{ px: 0 }}>
         <ProjectList />
       </Container>
     </ProjectProvider>

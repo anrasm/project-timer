@@ -32,8 +32,12 @@ export const ProjectList = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box display="flex" gap={2} mb={4}>
+    <Container maxWidth="md" sx={{ py: 4, px: 2 }}>
+      <Box 
+        display="flex"
+        gap={2} mb={4}
+        flexDirection={{ xs: 'column', sm: 'row' }}  
+      >
         <TextField 
           value={newProjectName}
           onChange={(e) => setNewProjectName(e.target.value)}
@@ -59,14 +63,19 @@ export const ProjectList = () => {
             sx={{ 
               py: 2,
               gap: 2,
-              alignItems: 'center' 
+              alignItems: 'center',
+              flexWrap: 'wrap'
             }}
           >
             <ListItemText 
               primary={project.name} 
               primaryTypographyProps={{ 
                 sx: { flexGrow: 1, mr: 2 } 
-              }} 
+              }}
+              sx={{
+                display: { xs: 'block', sm: 'initial' },
+                width: { xs: '100%', sm: 'auto' }
+              }}
             />
             <Timer project={project} />
             <Button 
